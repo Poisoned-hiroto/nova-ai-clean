@@ -7,8 +7,8 @@ from http.server import BaseHTTPRequestHandler
 from urllib.request import Request, urlopen
 from urllib.error import HTTPError, URLError
 
-API_URL = "https://router.huggingface.co/v1/chat/completions"
-MODEL = "openai/gpt-oss-120b"
+API_URL = "https://integrate.api.nvidia.com/v1/chat/completions"
+MODEL = "nvidia/nemotron-3-ultra-550b-a55b"
 
 
 class handler(BaseHTTPRequestHandler):
@@ -17,14 +17,14 @@ class handler(BaseHTTPRequestHandler):
         if urlparse(self.path).path.rstrip("/") != "/api/chat":
             return self._send(404, {"error": "Not found."})
 
-        token = os.environ.get("HF_TOKEN")
+        token = os.environ.get("NVIDIA_API_KEY")
         if not token:
             return self._send(
                 500,
                 {
                     "error": (
-                        "Server is missing HF_TOKEN. Add it in "
-                        "Vercel Project Settings → Environment Variables."
+                        "NVIDIA_API_KEY is missing. Add it in "
+                        "Vercel Project Settings > Environment Variables."
                     )
                 },
             )
@@ -39,15 +39,18 @@ class handler(BaseHTTPRequestHandler):
             messages = payload.get("messages", [])
 
             if not isinstance(messages, list) or not messages:
-                return self._send(400, {"error": "Send at least one message."})
+                return self._send(
+                    400, {"error": "Send at least one message."}
+                )
 
             clean = [
                 {
                     "role": "system",
                     "content": (
-                        "You are NOVA AI, a helpful, clear, practical assistant. "
-                        "Use concise answers by default. Format code in Markdown "
-                        "code fences. If you are uncertain, say so."
+                        "You are NOVA AI, a helpful, clear, practical "
+                        "assistant. Use concise answers by default. "
+                        "Format code in Markdown code fences. "
+                        "If uncertain, say so."
                     ),
                 }
             ]
@@ -71,13 +74,19 @@ class handler(BaseHTTPRequestHandler):
                 })
 
             if len(clean) == 1:
-                return self._send(400, {"error": "No valid messages provided."})
+                return self._send(
+                    400, {"error": "No valid messages provided."}
+                )
 
             body = json.dumps({
                 "model": MODEL,
                 "messages": clean,
-                "max_tokens": 800,
+                "max_tokens": 2048,
                 "temperature": 0.7,
+                "stream": False,
+                "chat_template_kwargs": {
+                    "enable_thinking": False
+                },
             }).encode("utf-8")
 
             req = Request(
@@ -86,6 +95,7 @@ class handler(BaseHTTPRequestHandler):
                 headers={
                     "Authorization": "Bearer " + token,
                     "Content-Type": "application/json",
+                    "Accept": "application/json",
                 },
                 method="POST",
             )
@@ -93,12 +103,32 @@ class handler(BaseHTTPRequestHandler):
             with urlopen(req, timeout=55) as resp:
                 result = json.loads(resp.read().decode("utf-8"))
 
-            reply = result["choices"][0]["message"]["content"]
-            return self._send(200, {"reply": reply})
+            choices = result.get("choices", [])
+            if not choices:
+                return self._send(
+                    502,
+                    {"error": "NVIDIA returned no response choices."},
+                )
+
+            message = choices[0].get("message", {})
+            reply = message.get("content")
+
+            if not isinstance(reply, str) or not reply.strip():
+                return self._send(
+                    502,
+                    {
+                        "error": (
+                            "NVIDIA returned an empty answer. "
+                            "Please try again."
+                        )
+                    },
+                )
+
+            return self._send(200, {"reply": reply.strip()})
 
         except HTTPError as exc:
             try:
-                detail = exc.read().decode("utf-8")[:500]
+                detail = exc.read().decode("utf-8")[:700]
             except Exception:
                 detail = ""
 
@@ -107,8 +137,9 @@ class handler(BaseHTTPRequestHandler):
                     502,
                     {
                         "error": (
-                            "The AI provider rejected the token or model access. "
-                            "Check your Hugging Face token and inference permissions."
+                            "NVIDIA rejected the API key or model access. "
+                            "Check your NVIDIA_API_KEY and NVIDIA model "
+                            "access. " + detail
                         )
                     },
                 )
@@ -116,55 +147,69 @@ class handler(BaseHTTPRequestHandler):
             if exc.code == 429:
                 return self._send(
                     429,
-                    {"error": "AI provider rate limit or free quota reached. Try again later."},
+                    {
+                        "error": (
+                            "NVIDIA rate limit or usage limit reached. "
+                            "Wait and try again. " + detail
+                        )
+                    },
                 )
 
             return self._send(
                 502,
-                {"error": "AI provider error (HTTP %s). %s" % (exc.code, detail)},
+                {
+                    "error": (
+                        "NVIDIA API error (HTTP %s). %s"
+                        % (exc.code, detail)
+                    )
+                },
             )
 
         except (URLError, TimeoutError):
             return self._send(
                 504,
-                {"error": "The AI provider took too long to respond. Try again."},
+                {
+                    "error": (
+                        "NVIDIA took too long to respond. "
+                        "Please try again."
+                    )
+                },
             )
 
         except (ValueError, KeyError, IndexError, TypeError):
             return self._send(
                 502,
-                {"error": "Unexpected response from the AI provider. Try again later."},
+                {"error": "Unexpected response from NVIDIA. Try again."},
             )
 
         except Exception:
-            return self._send(500, {"error": "Unexpected server error."})
+            return self._send(
+                500, {"error": "Unexpected server error."}
+            )
 
     def do_GET(self):
         path = unquote(urlparse(self.path).path)
 
-        # The chat endpoint accepts POST requests only.
         if path.rstrip("/") == "/api/chat":
             return self._send(
-                405,
-                {"error": "Use POST for chat requests."},
+                405, {"error": "Use POST for chat requests."}
             )
 
-        # Serve the frontend entry page at the root URL.
         relative_path = "index.html" if path == "/" else path.lstrip("/")
 
         root = os.path.realpath(os.getcwd())
         target = os.path.realpath(os.path.join(root, relative_path))
 
-        # Prevent requests from accessing files outside the project directory.
         if os.path.commonpath([root, target]) != root:
             return self._send(403, {"error": "Forbidden"})
 
         if not os.path.isfile(target):
             return self._send(404, {"error": "File not found"})
 
-        content_type = mimetypes.guess_type(target)[0]
-        if not content_type:
-            content_type = "application/octet-stream"
+        content_type = (
+            mimetypes.guess_type(target)[0]
+            or "application/octet-stream"
+        )
 
         try:
             with open(target, "rb") as file:
@@ -178,13 +223,17 @@ class handler(BaseHTTPRequestHandler):
             self.wfile.write(data)
 
         except OSError:
-            return self._send(500, {"error": "Could not read the requested file."})
+            return self._send(
+                500, {"error": "Could not read the requested file."}
+            )
 
     def _send(self, status, data):
         encoded = json.dumps(data).encode("utf-8")
 
         self.send_response(status)
-        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header(
+            "Content-Type", "application/json; charset=utf-8"
+        )
         self.send_header("Cache-Control", "no-store")
         self.send_header("Content-Length", str(len(encoded)))
         self.end_headers()
