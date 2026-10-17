@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0b1020">
+  <meta name="description" content="NOVA AI — your personal AI assistant.">
+  <title>NOVA AI</title>
+  <link rel="manifest" href="/manifest.json">
+  <link rel="icon" href="/icons/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar" id="sidebar">
+      <div class="brand"><div class="brand-mark">✳</div><div><strong>NOVA AI</strong><small>PERSONAL ASSISTANT</small></div></div>
+      <button class="new-chat" id="newChat"><span>＋</span> New chat</button>
+      <div class="side-label">YOUR SPACE</div>
+      <button class="side-item active"><span>◷</span> Current conversation</button>
+      <div class="sidebar-bottom">
+        <div class="status-dot"></div><span>AI assistant ready</span>
+        <button class="install-btn" id="installBtn" hidden>＋ Install app</button>
+        <p>Built for curiosity.<br>Powered by AI.</p>
+      </div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <button class="mobile-menu" id="mobileMenu" aria-label="Open menu">☰</button>
+        <div class="mobile-brand"><span class="brand-mark small">✳</span> NOVA AI</div>
+        <div class="top-actions">
+          <span class="online-pill"><i></i> Assistant online</span>
+          <button class="icon-btn" id="clearChat" title="Clear conversation" aria-label="Clear conversation">⌫</button>
+        </div>
+      </header>
+
+      <section class="conversation" id="conversation" aria-live="polite">
+        <div class="welcome" id="welcome">
+          <div class="orb"><span>✳</span></div>
+          <div class="eyebrow">YOUR AI, YOUR WORKFLOW</div>
+          <h1>What can I help<br><em>you figure out?</em></h1>
+          <p>Ask a question, build something, or turn a rough idea into a plan.</p>
+          <div class="suggestions">
+            <button class="suggestion" data-prompt="Explain Python functions with a simple example."><span class="suggestion-icon purple">⌘</span><span><b>Learn something</b><small>Explain a topic simply</small></span><span class="suggestion-arrow">↗</span></button>
+            <button class="suggestion" data-prompt="Give me three practical AI project ideas for a beginner."><span class="suggestion-icon amber">✦</span><span><b>Explore ideas</b><small>Brainstorm your next project</small></span><span class="suggestion-arrow">↗</span></button>
+            <button class="suggestion" data-prompt="Help me debug a Python program. Tell me what information you need."><span class="suggestion-icon blue">{ }</span><span><b>Write or debug code</b><small>Build and troubleshoot</small></span><span class="suggestion-arrow">↗</span></button>
+            <button class="suggestion" data-prompt="Create a realistic 7-day study plan for learning web development."><span class="suggestion-icon green">↗</span><span><b>Make a plan</b><small>Turn goals into clear steps</small></span><span class="suggestion-arrow">↗</span></button>
+          </div>
+        </div>
+        <div class="messages" id="messages"></div>
+      </section>
+
+      <footer class="composer-wrap">
+        <form class="composer" id="chatForm">
+          <textarea id="prompt" rows="1" maxlength="6000" placeholder="Message NOVA AI..." aria-label="Message NOVA AI"></textarea>
+          <div class="composer-bottom">
+            <span class="composer-note"><span>✳</span> AI can make mistakes. Verify important information.</span>
+            <button class="send-btn" id="sendBtn" type="submit" aria-label="Send message"><span>↑</span></button>
+          </div>
+        </form>
+        <div class="footer-note">NOVA AI <span>·</span> A little help for big ideas</div>
+      </footer>
+    </main>
+  </div>
+  <div class="toast" id="toast" role="status"></div>
+  <script src="/app.js" defer></script>
+</body>
+</html>
