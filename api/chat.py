@@ -1,6 +1,8 @@
+
 import json
 import os
 import mimetypes
+import time
 from urllib.parse import urlparse, unquote
 from http.server import BaseHTTPRequestHandler
 from urllib.request import Request, urlopen
@@ -17,6 +19,7 @@ class handler(BaseHTTPRequestHandler):
             return self._send(404, {"error": "Not found."})
 
         token = os.environ.get("NVIDIA_API_KEY")
+
         if not token:
             return self._send(
                 500,
@@ -32,9 +35,14 @@ class handler(BaseHTTPRequestHandler):
             length = int(self.headers.get("Content-Length", "0"))
 
             if length <= 0 or length > 100_000:
-                return self._send(400, {"error": "Invalid request size."})
+                return self._send(
+                    400, {"error": "Invalid request size."}
+                )
 
-            payload = json.loads(self.rfile.read(length).decode("utf-8"))
+            payload = json.loads(
+                self.rfile.read(length).decode("utf-8")
+            )
+
             messages = payload.get("messages", [])
 
             if not isinstance(messages, list) or not messages:
@@ -99,10 +107,31 @@ class handler(BaseHTTPRequestHandler):
                 method="POST",
             )
 
-            with urlopen(req, timeout=55) as resp:
-                result = json.loads(resp.read().decode("utf-8"))
+            # Retry temporary NVIDIA server errors up to 3 times.
+            result = None
+
+            for attempt in range(3):
+                try:
+                    with urlopen(req, timeout=25) as resp:
+                        result = json.loads(
+                            resp.read().decode("utf-8")
+                        )
+                    break
+
+                except HTTPError as exc:
+                    if exc.code in (502, 503, 504) and attempt < 2:
+                        time.sleep(1 + attempt * 2)
+                        continue
+                    raise
+
+            if result is None:
+                return self._send(
+                    502,
+                    {"error": "NVIDIA did not return a response."},
+                )
 
             choices = result.get("choices", [])
+
             if not choices:
                 return self._send(
                     502,
@@ -137,8 +166,8 @@ class handler(BaseHTTPRequestHandler):
                     {
                         "error": (
                             "NVIDIA rejected the API key or model access. "
-                            "Check your NVIDIA_API_KEY and NVIDIA model "
-                            "access. " + detail
+                            "Check NVIDIA_API_KEY and model permissions. "
+                            + detail
                         )
                     },
                 )
@@ -148,8 +177,20 @@ class handler(BaseHTTPRequestHandler):
                     429,
                     {
                         "error": (
-                            "NVIDIA rate limit or usage limit reached. "
-                            "Wait and try again. " + detail
+                            "NVIDIA rate or usage limit reached. "
+                            "Please wait and try again. " + detail
+                        )
+                    },
+                )
+
+            if exc.code in (502, 503, 504):
+                return self._send(
+                    503,
+                    {
+                        "error": (
+                            "NVIDIA is temporarily unavailable after "
+                            "multiple attempts. Please try again shortly. "
+                            + detail
                         )
                     },
                 )
@@ -169,7 +210,7 @@ class handler(BaseHTTPRequestHandler):
                 504,
                 {
                     "error": (
-                        "NVIDIA took too long to respond. "
+                        "NVIDIA timed out or could not be reached. "
                         "Please try again."
                     )
                 },
@@ -194,10 +235,14 @@ class handler(BaseHTTPRequestHandler):
                 405, {"error": "Use POST for chat requests."}
             )
 
-        relative_path = "index.html" if path == "/" else path.lstrip("/")
+        relative_path = (
+            "index.html" if path == "/" else path.lstrip("/")
+        )
 
         root = os.path.realpath(os.getcwd())
-        target = os.path.realpath(os.path.join(root, relative_path))
+        target = os.path.realpath(
+            os.path.join(root, relative_path)
+        )
 
         if os.path.commonpath([root, target]) != root:
             return self._send(403, {"error": "Forbidden"})
