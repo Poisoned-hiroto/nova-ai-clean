@@ -1,5 +1,7 @@
 import json
 import os
+import mimetypes
+from urllib.parse import urlparse, unquote
 from http.server import BaseHTTPRequestHandler
 from urllib.request import Request, urlopen
 from urllib.error import HTTPError, URLError
@@ -62,8 +64,38 @@ class handler(BaseHTTPRequestHandler):
         except Exception:
             return self._send(500, {"error": "Unexpected server error."})
 
-    def do_GET(self):
-        return self._send(405, {"error": "Use POST for chat requests."})
+   def do_GET(self):
+    path = unquote(urlparse(self.path).path)
+
+    if path == "/api/chat":
+        return self._send(
+            405,
+            {"error": "Use POST for chat requests."}
+        )
+
+    relative_path = "index.html" if path == "/" else path.lstrip("/")
+    root = os.path.abspath(os.getcwd())
+    target = os.path.abspath(os.path.join(root, relative_path))
+
+    if os.path.commonpath([root, target]) != root:
+        return self._send(403, {"error": "Forbidden"})
+
+    if not os.path.isfile(target):
+        return self._send(404, {"error": "File not found"})
+
+    content_type = mimetypes.guess_type(target)[0]
+    if not content_type:
+        content_type = "application/octet-stream"
+
+    with open(target, "rb") as file:
+        data = file.read()
+
+    self.send_response(200)
+    self.send_header("Content-Type", content_type)
+    self.send_header("Content-Length", str(len(data)))
+    self.send_header("Cache-Control", "no-cache")
+    self.end_headers()
+    self.wfile.write(data)
 
     def _send(self, status, data):
         encoded = json.dumps(data).encode("utf-8")
