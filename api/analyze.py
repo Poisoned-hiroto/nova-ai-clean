@@ -25,9 +25,10 @@ ALLOWED_TYPES = {
 
 class handler(BaseHTTPRequestHandler):
     def do_POST(self):
-        if self.path.split("?")[0].rstrip("/") != "/api/analyze":
-            return self.send_json(404, {"error": "Not found."})
+request_path = self.path.split("?", 1)[0].rstrip("/")
 
+if request_path not in ("", "/", "/api/analyze"):
+    return self.send_json(404, {"error": "Not found."})
         try:
             length = int(self.headers.get("Content-Length", "0"))
 
