@@ -879,3 +879,100 @@ button:disabled {
     animation-duration: 0.01ms !important;
   }
 }
+
+/* NOVA AI — file attachments */
+.composer-tools {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  min-width: 0;
+}
+
+.attach-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 10px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--panel2);
+  color: #d7d2ff;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.attach-btn:hover {
+  border-color: var(--purple);
+  background: rgba(137, 119, 255, 0.1);
+}
+
+.composer-note {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.attachment-preview {
+  margin: 0 auto 9px;
+  width: min(100%, 780px);
+}
+
+.attachment-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel);
+}
+
+.attachment-details {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 3px;
+}
+
+.attachment-details strong {
+  overflow-wrap: anywhere;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.attachment-details small {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.attachment-remove {
+  flex: 0 0 auto;
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel2);
+  cursor: pointer;
+  font-size: 18px;
+}
+
+.attachment-remove:hover {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+@media (max-width: 480px) {
+  .composer-note {
+    font-size: 10px;
+  }
+
+  .attach-btn {
+    padding: 7px 8px;
+  }
+
+  .composer-tools {
+    gap: 7px;
+  }
+}
+
