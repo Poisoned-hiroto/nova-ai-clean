@@ -1,9 +1,10 @@
-
 [project]
 name = "nova-ai-chatbot"
 version = "1.0.0"
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+    "pymongo[srv]==4.10.1"
+]
 
 [tool.vercel]
 entrypoint = "api.chat:handler"
