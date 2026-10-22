@@ -2,6 +2,7 @@
 import base64
 import json
 import os
+import re
 from http.server import BaseHTTPRequestHandler
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
@@ -11,7 +12,7 @@ GEMINI_URL = (
     "gemini-2.5-flash:generateContent"
 )
 
-MAX_REQUEST_BYTES = 5_000_000
+MAX_REQUEST_BYTES = 5_700_000
 MAX_FILE_BYTES = 4 * 1024 * 1024
 
 ALLOWED_TYPES = {
@@ -23,134 +24,148 @@ ALLOWED_TYPES = {
 }
 
 
+def json_bytes(data):
+    return json.dumps(data).encode("utf-8")
+
+
 class handler(BaseHTTPRequestHandler):
+
+    def send_json(self, status, data):
+        body = json_bytes(data)
+        self.send_response(status)
+        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def do_GET(self):
+        return self.send_json(200, {
+            "service": "NOVA file analysis",
+            "status": "ready",
+            "method": "POST",
+        })
+
     def do_POST(self):
         try:
             length = int(self.headers.get("Content-Length", "0"))
 
             if length <= 0 or length > MAX_REQUEST_BYTES:
-                return self.send_json(
-                    413,
-                    {"error": "Request too large. Use a file under 4 MB."}
-                )
+                return self.send_json(413, {
+                    "error": "Request too large. Choose a file under 4 MB."
+                })
 
-            raw_body = self.rfile.read(length)
-            payload = json.loads(raw_body.decode("utf-8"))
+            raw = self.rfile.read(length)
+            payload = json.loads(raw.decode("utf-8"))
 
             if not isinstance(payload, dict):
-                return self.send_json(
-                    400, {"error": "Invalid request body."}
-                )
+                return self.send_json(400, {
+                    "error": "Invalid request body."
+                })
 
-            mime_type = payload.get("mimeType")
             file_name = payload.get("fileName", "uploaded-file")
-            encoded_file = payload.get("fileData")
+            mime_type = payload.get("mimeType", "")
+            file_data = payload.get("fileData", "")
             question = payload.get("question", "")
 
             if mime_type not in ALLOWED_TYPES:
-                return self.send_json(
-                    400,
-                    {"error": "Only images and PDF files are supported."}
-                )
+                return self.send_json(400, {
+                    "error": "Unsupported file type. Upload an image or PDF."
+                })
 
-            if not isinstance(encoded_file, str) or not encoded_file:
-                return self.send_json(
-                    400, {"error": "No file data received."}
-                )
+            if not isinstance(file_data, str) or not file_data:
+                return self.send_json(400, {
+                    "error": "No file data received. Please attach the file again."
+                })
 
-            if not isinstance(question, str):
-                return self.send_json(
-                    400, {"error": "Invalid question."}
-                )
-
-            if len(question) > 4000:
-                return self.send_json(
-                    400, {"error": "Question is too long."}
-                )
+            if not isinstance(question, str) or len(question) > 4000:
+                return self.send_json(400, {
+                    "error": "The question is invalid or too long."
+                })
 
             try:
-                file_bytes = base64.b64decode(
-                    encoded_file, validate=True
-                )
+                file_bytes = base64.b64decode(file_data, validate=True)
             except Exception:
-                return self.send_json(
-                    400, {"error": "Invalid file encoding."}
-                )
+                return self.send_json(400, {
+                    "error": "The file encoding is invalid. Upload it again."
+                })
 
-            if not file_bytes or len(file_bytes) > MAX_FILE_BYTES:
-                return self.send_json(
-                    413, {"error": "File must be smaller than 4 MB."}
-                )
+            if not file_bytes:
+                return self.send_json(400, {
+                    "error": "The uploaded file is empty."
+                })
 
-            # Validate common file signatures.
+            if len(file_bytes) > MAX_FILE_BYTES:
+                return self.send_json(413, {
+                    "error": "File must be 4 MB or smaller."
+                })
+
+            # Basic file-signature validation.
+            signatures = {
+                "application/pdf": b"%PDF-",
+                "image/jpeg": b"\xff\xd8\xff",
+                "image/png": b"\x89PNG\r\n\x1a\n",
+                "image/gif": b"GIF8",
+            }
+
+            signature = signatures.get(mime_type)
+            if signature and not file_bytes.startswith(signature):
+                return self.send_json(400, {
+                    "error": "The file content does not match its file type."
+                })
+
             if (
-                mime_type == "application/pdf"
-                and not file_bytes.startswith(b"%PDF-")
-            ):
-                return self.send_json(
-                    400, {"error": "The uploaded PDF appears invalid."}
+                mime_type == "image/webp"
+                and (
+                    len(file_bytes) < 12
+                    or file_bytes[:4] != b"RIFF"
+                    or file_bytes[8:12] != b"WEBP"
                 )
-
-            if (
-                mime_type == "image/jpeg"
-                and not file_bytes.startswith(b"\xff\xd8\xff")
             ):
-                return self.send_json(
-                    400, {"error": "The uploaded JPEG appears invalid."}
-                )
-
-            if (
-                mime_type == "image/png"
-                and not file_bytes.startswith(b"\x89PNG\r\n\x1a\n")
-            ):
-                return self.send_json(
-                    400, {"error": "The uploaded PNG appears invalid."}
-                )
+                return self.send_json(400, {
+                    "error": "The uploaded WebP image appears invalid."
+                })
 
             api_key = os.environ.get("GEMINI_API_KEY", "").strip()
-
             if not api_key:
-                return self.send_json(
-                    500,
-                    {"error": "GEMINI_API_KEY is missing in Vercel settings."}
-                )
+                return self.send_json(500, {
+                    "error": "GEMINI_API_KEY is missing in Vercel Environment Variables."
+                })
 
-            safe_file_name = (
-                file_name[:180]
+            safe_name = (
+                re.sub(r"[\r\n\x00]", "", file_name)[:180]
                 if isinstance(file_name, str)
                 else "uploaded-file"
             )
 
             user_question = question.strip() or (
-                "Describe this file and extract its important information."
+                "Analyse this file and explain its important information."
             )
 
             prompt = (
-                "You are NOVA AI, an assistant that analyses images and "
-                "documents. Carefully inspect the supplied file. Extract "
-                "visible text where possible, explain important details, "
-                "preserve tables using Markdown when useful, and distinguish "
-                "facts from uncertainty. Do not invent unreadable content.\n\n"
-                f"File name: {safe_file_name}\n"
+                "You are NOVA AI, a precise assistant for image and document "
+                "analysis. Inspect the supplied file carefully. Extract visible "
+                "text when possible, explain relevant details, preserve tables "
+                "using Markdown when useful, and clearly state uncertainty. "
+                "Never invent unreadable information.\n\n"
+                f"File name: {safe_name}\n"
                 f"User request: {user_question}"
             )
 
             request_body = {
-                "contents": [
-                    {
-                        "parts": [
-                            {"text": prompt},
-                            {
-                                "inline_data": {
-                                    "mime_type": mime_type,
-                                    "data": base64.b64encode(
-                                        file_bytes
-                                    ).decode("ascii"),
-                                }
-                            },
-                        ]
-                    }
-                ],
+                "contents": [{
+                    "parts": [
+                        {"text": prompt},
+                        {
+                            "inline_data": {
+                                "mime_type": mime_type,
+                                "data": base64.b64encode(
+                                    file_bytes
+                                ).decode("ascii"),
+                            }
+                        },
+                    ]
+                }],
                 "generationConfig": {
                     "temperature": 0.2,
                     "maxOutputTokens": 4096,
@@ -159,7 +174,7 @@ class handler(BaseHTTPRequestHandler):
 
             request = Request(
                 GEMINI_URL + "?key=" + api_key,
-                data=json.dumps(request_body).encode("utf-8"),
+                data=json_bytes(request_body),
                 headers={"Content-Type": "application/json"},
                 method="POST",
             )
@@ -171,76 +186,52 @@ class handler(BaseHTTPRequestHandler):
                     )
 
             except HTTPError as exc:
-                # Log only a short, sanitized error detail.
                 detail = exc.read().decode(
                     "utf-8", errors="replace"
-                )[:300]
+                )[:1200]
                 print("Gemini HTTP error:", exc.code, detail)
 
-                if exc.code == 400:
-                    return self.send_json(
-                        502,
-                        {
-                            "error": (
-                                "Gemini could not process this file. "
-                                "Check its format and try again."
-                            )
-                        },
-                    )
+                if exc.code in (400, 415):
+                    return self.send_json(502, {
+                        "error": (
+                            "Gemini could not process this file. "
+                            "Check the file format and try another file."
+                        )
+                    })
 
                 if exc.code in (401, 403):
-                    return self.send_json(
-                        502,
-                        {
-                            "error": (
-                                "Gemini rejected the API key or access. "
-                                "Check GEMINI_API_KEY."
-                            )
-                        },
-                    )
+                    return self.send_json(502, {
+                        "error": (
+                            "Gemini rejected the API key or access. "
+                            "Check GEMINI_API_KEY and API permissions."
+                        )
+                    })
 
                 if exc.code == 429:
-                    return self.send_json(
-                        429,
-                        {
-                            "error": (
-                                "Gemini rate limit or quota reached. "
-                                "Try again later."
-                            )
-                        },
-                    )
+                    return self.send_json(429, {
+                        "error": "Gemini quota or rate limit reached. Try again later."
+                    })
 
-                return self.send_json(
-                    502, {"error": "Gemini API request failed."}
-                )
+                return self.send_json(502, {
+                    "error": f"Gemini API request failed (HTTP {exc.code})."
+                })
 
             except (URLError, TimeoutError):
-                return self.send_json(
-                    504,
-                    {"error": "Gemini request timed out. Try again."}
-                )
+                return self.send_json(504, {
+                    "error": "Gemini timed out. Please try again."
+                })
 
             candidates = result.get("candidates", [])
-
             if not candidates:
                 print(
                     "Gemini returned no candidates:",
                     result.get("promptFeedback", {})
                 )
-                return self.send_json(
-                    502,
-                    {
-                        "error": (
-                            "Gemini returned no analysis. "
-                            "Try another file."
-                        )
-                    },
-                )
+                return self.send_json(502, {
+                    "error": "Gemini returned no analysis. Try another file."
+                })
 
-            parts = candidates[0].get(
-                "content", {}
-            ).get("parts", [])
-
+            parts = candidates[0].get("content", {}).get("parts", [])
             answer = "\n".join(
                 part.get("text", "")
                 for part in parts
@@ -249,48 +240,23 @@ class handler(BaseHTTPRequestHandler):
             ).strip()
 
             if not answer:
-                return self.send_json(
-                    502,
-                    {"error": "Gemini returned an empty analysis."}
-                )
+                return self.send_json(502, {
+                    "error": "Gemini returned an empty analysis."
+                })
 
-            return self.send_json(
-                200,
-                {
-                    "analysis": answer,
-                    "fileName": safe_file_name,
-                    "mimeType": mime_type,
-                },
-            )
+            return self.send_json(200, {
+                "analysis": answer,
+                "fileName": safe_name,
+                "mimeType": mime_type,
+            })
 
         except (ValueError, TypeError):
-            return self.send_json(
-                400, {"error": "Invalid request body."}
-            )
+            return self.send_json(400, {
+                "error": "Invalid request. Please upload the file again."
+            })
 
         except Exception as exc:
             print("NOVA analysis error:", type(exc).__name__)
-            return self.send_json(
-                500,
-                {
-                    "error": (
-                        "Analysis failed. Check Vercel function logs."
-                    )
-                },
-            )
-
-    def do_GET(self):
-        return self.send_json(
-            405, {"error": "Use POST for file analysis."}
-        )
-
-    def send_json(self, status, data):
-        encoded = json.dumps(data).encode("utf-8")
-        self.send_response(status)
-        self.send_header(
-            "Content-Type", "application/json; charset=utf-8"
-        )
-        self.send_header("Cache-Control", "no-store")
-        self.send_header("Content-Length", str(len(encoded)))
-        self.end_headers()
-        self.wfile.write(encoded)
+            return self.send_json(500, {
+                "error": "Analysis failed. Check the Vercel function logs."
+            })
