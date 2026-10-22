@@ -6,7 +6,11 @@ const welcome = document.getElementById('welcome');
 const sendBtn = document.getElementById('sendBtn');
 const toast = document.getElementById('toast');
 const installBtn = document.getElementById('installBtn');
+const fileInput = document.getElementById('fileInput');
+const attachBtn = document.getElementById('attachBtn');
+const attachmentPreview = document.getElementById('attachmentPreview');
 
+let selectedFile = null;
 let conversation = [];
 let activeChatId = localStorage.getItem('nova-active-chat') || null;
 let deferredInstall = null;
@@ -489,3 +493,175 @@ async function initializeChatHistory() {
 }
 
 initializeChatHistory();
+
+function clearSelectedFile() {
+  selectedFile = null;
+  fileInput.value = '';
+  attachmentPreview.innerHTML = '';
+  attachmentPreview.hidden = true;
+}
+
+function showSelectedFile(file) {
+  attachmentPreview.innerHTML = '';
+
+  const item = document.createElement('div');
+  item.className = 'attachment-item';
+
+  const details = document.createElement('div');
+  details.className = 'attachment-details';
+
+  const name = document.createElement('strong');
+  name.textContent = file.name;
+
+  const size = document.createElement('small');
+  size.textContent = `${(file.size / 1024 / 1024).toFixed(2)} MB`;
+
+  details.append(name, size);
+
+  const remove = document.createElement('button');
+  remove.type = 'button';
+  remove.className = 'attachment-remove';
+  remove.textContent = '×';
+  remove.setAttribute('aria-label', 'Remove attachment');
+  remove.addEventListener('click', clearSelectedFile);
+
+  item.append(details, remove);
+  attachmentPreview.append(item);
+  attachmentPreview.hidden = false;
+}
+
+attachBtn.addEventListener('click', () => fileInput.click());
+
+fileInput.addEventListener('change', () => {
+  const file = fileInput.files && fileInput.files[0];
+  if (!file) return;
+
+  const allowed = [
+    'image/jpeg',
+    'image/png',
+    'image/webp',
+    'image/gif',
+    'application/pdf'
+  ];
+
+  if (!allowed.includes(file.type)) {
+    clearSelectedFile();
+    showToast('Choose an image or PDF file.');
+    return;
+  }
+
+  if (file.size > 4 * 1024 * 1024) {
+    clearSelectedFile();
+    showToast('File must be smaller than 4 MB.');
+    return;
+  }
+
+  selectedFile = file;
+  showSelectedFile(file);
+});
+
+async function analyzeSelectedFile(file, question) {
+  const base64 = await new Promise((resolve, reject) => {
+    const reader = new FileReader();
+
+    reader.onload = () => {
+      const result = String(reader.result || '');
+      const comma = result.indexOf(',');
+
+      if (comma < 0) {
+        reject(new Error('Could not read this file.'));
+        return;
+      }
+
+      resolve(result.slice(comma + 1));
+    };
+
+    reader.onerror = () => reject(new Error('Could not read this file.'));
+    reader.readAsDataURL(file);
+  });
+
+  const response = await fetch('/api/analyze', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      fileName: file.name,
+      mimeType: file.type,
+      fileData: base64,
+      question
+    })
+  });
+
+  const data = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    throw new Error(data.error || `File analysis failed (${response.status}).`);
+  }
+
+  return data.analysis;
+}
+
+// Intercept the existing form submit only when a file is attached.
+// Without a file, the existing NOVA chat workflow remains unchanged.
+form.addEventListener('submit', async event => {
+  if (!selectedFile) return;
+
+  event.preventDefault();
+
+  if (sendBtn.disabled || isLoadingChat) return;
+
+  const file = selectedFile;
+  const question = input.value.trim();
+
+  sendBtn.disabled = true;
+  attachBtn.disabled = true;
+  input.value = '';
+  input.style.height = 'auto';
+
+  const userText = question
+    ? `${question}\n\nAttached file: ${file.name}`
+    : `Please analyse this file: ${file.name}`;
+
+  addMessage('user', userText);
+  const typing = showTyping();
+
+  try {
+    const analysis = await analyzeSelectedFile(file, question);
+
+    typing.remove();
+    addMessage(
+      'assistant',
+      `## File analysis: ${file.name}\n\n${analysis}`,
+      true
+    );
+
+    // Save this result to the current chat when one exists.
+    // Normal text-chat messages continue using the existing API.
+    if (activeChatId) {
+      conversation.push({ role: 'user', content: userText });
+      conversation.push({ role: 'assistant', content: analysis });
+
+      try {
+        sessionStorage.setItem('nova-history', JSON.stringify(conversation));
+      } catch {}
+
+      showToast('Analysis complete. Note: file analysis is not yet persisted to MongoDB.');
+    } else {
+      showToast('File analysis complete.');
+    }
+
+    clearSelectedFile();
+  } catch (error) {
+    typing.remove();
+    addMessage(
+      'assistant',
+      `I couldn't analyse this file. ${error.message || 'Please try again.'}`,
+      true
+    );
+    showToast('File analysis failed');
+  } finally {
+    sendBtn.disabled = false;
+    attachBtn.disabled = false;
+    input.focus();
+  }
+});
+
