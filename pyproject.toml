@@ -5,3 +5,5 @@ requires-python = ">=3.12"
 dependencies = [
     "pymongo[srv]==4.10.1"
 ]
+[tool.vercel]
+entrypoint = "api/chat.py"
