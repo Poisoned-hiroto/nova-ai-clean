@@ -368,7 +368,13 @@ function createHistorySection() {
       <div id="novaChatList"></div>
     `;
 
-    sidebar.appendChild(section);
+    const sidebarBottom = sidebar.querySelector('.sidebar-bottom');
+
+if (sidebarBottom) {
+  sidebar.insertBefore(section, sidebarBottom);
+} else {
+  sidebar.appendChild(section);
+}
   }
 
   return section;
