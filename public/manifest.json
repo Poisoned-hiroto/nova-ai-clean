@@ -1,0 +1,14 @@
+{
+  "name": "NOVA AI — Personal Assistant",
+  "short_name": "NOVA AI",
+  "description": "Your personal AI assistant for ideas, learning, and coding.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#090d19",
+  "theme_color": "#0b1020",
+  "icons": [
+    {"src": "/icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any"}
+  ]
+}
