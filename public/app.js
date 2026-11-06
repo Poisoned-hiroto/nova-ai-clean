@@ -229,7 +229,13 @@ async function sendMessage(text) {
 
   try {
     if (!activeChatId) {
-      await createChat();
+      try {
+        await createChat();
+      } catch (historyError) {
+        activeChatId = null;
+        localStorage.removeItem('nova-active-chat');
+        showToast('History unavailable. Chat will continue without saving.');
+      }
     }
 
     conversation.push({
@@ -575,7 +581,9 @@ async function analyzeSelectedFile(file, question) {
     fileName: file.name,
     mimeType: file.type,
     fileData: base64,
-    question
+    question,
+    guestId,
+    chatId: activeChatId
   });
 
   // Try both route forms in case the deployment exposes
@@ -655,6 +663,16 @@ async function handleFileAnalysis() {
   const typing = showTyping();
 
   try {
+    if (!activeChatId) {
+      try {
+        await createChat();
+      } catch (historyError) {
+        activeChatId = null;
+        localStorage.removeItem('nova-active-chat');
+        showToast('History unavailable. Analysis will continue without saving.');
+      }
+    }
+
     const analysis = await analyzeSelectedFile(file, question);
 
     typing.remove();
@@ -679,6 +697,7 @@ async function handleFileAnalysis() {
     });
 
     saveLocalConversation();
+    await refreshChatList();
 
     clearSelectedFile();
 
