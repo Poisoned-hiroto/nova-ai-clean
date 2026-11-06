@@ -581,7 +581,6 @@ async function analyzeSelectedFile(file, question) {
   // Try both route forms in case the deployment exposes
   // the Python function using the explicit .py path.
   const endpoints = [
-    '/api/analyze',
     '/api/analyze.py'
   ];
 
