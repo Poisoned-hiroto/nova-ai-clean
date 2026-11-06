@@ -581,7 +581,7 @@ async function analyzeSelectedFile(file, question) {
   // Try both route forms in case the deployment exposes
   // the Python function using the explicit .py path.
   const endpoints = [
-    '/api/analyze.py'
+    '/api/analyze'
   ];
 
   let lastError = 'Analysis endpoint not found. Check the Vercel deployment.';
