@@ -1,37 +1,10 @@
 {
-  "version": 2,
-  "builds": [
-    {
-      "src": "api/chat.py",
-      "use": "@vercel/python"
+  "functions": {
+    "api/chat.py": {
+      "maxDuration": 60
     },
-    {
-      "src": "api/analyze.py",
-      "use": "@vercel/python"
-    },
-    {
-      "src": "index.html",
-      "use": "@vercel/static"
-    },
-    {
-      "src": "app.js",
-      "use": "@vercel/static"
-    },
-    {
-      "src": "styles.css",
-      "use": "@vercel/static"
-    },
-    {
-      "src": "manifest.json",
-      "use": "@vercel/static"
-    },
-    {
-      "src": "sw.js",
-      "use": "@vercel/static"
-    },
-    {
-      "src": "icons/icon.svg",
-      "use": "@vercel/static"
+    "api/analyze.py": {
+      "maxDuration": 60
     }
-  ]
+  }
 }
