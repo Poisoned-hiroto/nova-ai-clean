@@ -1,18 +1,15 @@
 import base64, json, os, re, time
 from datetime import datetime, timezone
-from pathlib import Path
 from urllib.request import Request, urlopen
 from urllib.error import HTTPError, URLError
 from bson import ObjectId
 from fastapi import FastAPI, Request as Req
 from fastapi.responses import JSONResponse
-from fastapi.staticfiles import StaticFiles
 from pymongo import MongoClient, DESCENDING
 
 NVIDIA_URL = "https://integrate.api.nvidia.com/v1/chat/completions"
 GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
 MODEL = "nvidia/nemotron-3-ultra-550b-a55b"
-PUBLIC = Path(__file__).parent / "public"
 MAX_FILE = 4 * 1024 * 1024
 _client = None
 _indexes = False
@@ -240,4 +237,3 @@ async def analyze(request: Req):
             print("NOVA analysis history save failed:", type(exc).__name__)
     return JSONResponse(content={"analysis": answer, "fileName": name, "mimeType": mime, "historySaved": saved})
 
-app.mount("/", StaticFiles(directory=str(PUBLIC), html=True), name="frontend")
