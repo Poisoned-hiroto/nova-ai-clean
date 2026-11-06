@@ -8,7 +8,7 @@ from fastapi.responses import JSONResponse
 from pymongo import MongoClient, DESCENDING
 
 NVIDIA_URL = "https://integrate.api.nvidia.com/v1/chat/completions"
-GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent"
 MODEL = "nvidia/nemotron-3-ultra-550b-a55b"
 MAX_FILE = 4 * 1024 * 1024
 _client = None
@@ -207,8 +207,15 @@ async def analyze(request: Req):
         with urlopen(req, timeout=45) as response:
             result = json.loads(response.read().decode())
     except HTTPError as exc:
-        print("Gemini HTTP error:", exc.code, exc.read().decode(errors="replace")[:300])
-        return err(429 if exc.code == 429 else 502, "Gemini request failed (HTTP " + str(exc.code) + "). Check API key, quota, and file format.")
+        details = exc.read().decode(errors="replace")[:500]
+        print("Gemini HTTP error:", exc.code, details)
+        if exc.code == 404:
+            return err(502, "Gemini model is unavailable to this API project. NOVA now uses gemini-3.8-flash; verify the model is enabled for your Gemini API key.")
+        if exc.code == 429:
+            return err(429, "Gemini quota or rate limit reached. Check billing and usage limits in Google AI Studio.")
+        if exc.code in (401, 403):
+            return err(502, "Gemini rejected the API key or project access. Check GEMINI_API_KEY and API restrictions.")
+        return err(502, "Gemini request failed (HTTP " + str(exc.code) + "). Check the Vercel runtime logs for details.")
     except (URLError, TimeoutError):
         return err(504, "Gemini timed out. Try again.")
     except Exception:
