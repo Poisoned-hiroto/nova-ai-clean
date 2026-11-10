@@ -221,6 +221,8 @@ async function sendMessage(text) {
   }
 
   sendBtn.disabled = true;
+  sendBtn.classList.add('is-loading');
+  sendBtn.setAttribute('aria-label', 'NOVA is responding');
 
   input.value = '';
   input.style.height = 'auto';
@@ -287,6 +289,8 @@ async function sendMessage(text) {
 
   } finally {
     sendBtn.disabled = false;
+    sendBtn.classList.remove('is-loading');
+    sendBtn.setAttribute('aria-label', 'Send message');
     input.focus();
   }
 }
@@ -653,6 +657,8 @@ async function handleFileAnalysis() {
     : `Please analyse this file: ${file.name}`;
 
   sendBtn.disabled = true;
+  sendBtn.classList.add('is-loading');
+  sendBtn.setAttribute('aria-label', 'Analysing file');
   attachBtn.disabled = true;
 
   input.value = '';
@@ -716,6 +722,8 @@ async function handleFileAnalysis() {
 
   } finally {
     sendBtn.disabled = false;
+    sendBtn.classList.remove('is-loading');
+    sendBtn.setAttribute('aria-label', 'Send message');
     attachBtn.disabled = false;
     input.focus();
   }
