@@ -221,6 +221,8 @@ async function sendMessage(text) {
   }
 
   sendBtn.disabled = true;
+  sendBtn.classList.add('is-loading');
+  sendBtn.setAttribute('aria-label', 'NOVA is responding');
 
   input.value = '';
   input.style.height = 'auto';
@@ -229,7 +231,13 @@ async function sendMessage(text) {
 
   try {
     if (!activeChatId) {
-      await createChat();
+      try {
+        await createChat();
+      } catch (historyError) {
+        activeChatId = null;
+        localStorage.removeItem('nova-active-chat');
+        showToast('History unavailable. Chat will continue without saving.');
+      }
     }
 
     conversation.push({
@@ -281,6 +289,8 @@ async function sendMessage(text) {
 
   } finally {
     sendBtn.disabled = false;
+    sendBtn.classList.remove('is-loading');
+    sendBtn.setAttribute('aria-label', 'Send message');
     input.focus();
   }
 }
@@ -575,7 +585,9 @@ async function analyzeSelectedFile(file, question) {
     fileName: file.name,
     mimeType: file.type,
     fileData: base64,
-    question
+    question,
+    guestId,
+    chatId: activeChatId
   });
 
   // Try both route forms in case the deployment exposes
@@ -645,6 +657,8 @@ async function handleFileAnalysis() {
     : `Please analyse this file: ${file.name}`;
 
   sendBtn.disabled = true;
+  sendBtn.classList.add('is-loading');
+  sendBtn.setAttribute('aria-label', 'Analysing file');
   attachBtn.disabled = true;
 
   input.value = '';
@@ -655,6 +669,16 @@ async function handleFileAnalysis() {
   const typing = showTyping();
 
   try {
+    if (!activeChatId) {
+      try {
+        await createChat();
+      } catch (historyError) {
+        activeChatId = null;
+        localStorage.removeItem('nova-active-chat');
+        showToast('History unavailable. Analysis will continue without saving.');
+      }
+    }
+
     const analysis = await analyzeSelectedFile(file, question);
 
     typing.remove();
@@ -679,6 +703,7 @@ async function handleFileAnalysis() {
     });
 
     saveLocalConversation();
+    await refreshChatList();
 
     clearSelectedFile();
 
@@ -697,6 +722,8 @@ async function handleFileAnalysis() {
 
   } finally {
     sendBtn.disabled = false;
+    sendBtn.classList.remove('is-loading');
+    sendBtn.setAttribute('aria-label', 'Send message');
     attachBtn.disabled = false;
     input.focus();
   }

@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#101114">
+  <meta name="description" content="NOVA AI — a personal assistant for clearer thinking, practical plans, chat and file analysis.">
+  <title>NOVA AI</title>
+  <link rel="manifest" href="/manifest.json">
+  <link rel="icon" href="/icons/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar" id="sidebar">
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true">✳</div>
+        <div class="brand-name">NOVA <span>AI</span></div>
+      </div>
+
+      <button class="new-chat" id="newChat" type="button">
+        <span aria-hidden="true">＋</span> New chat
+      </button>
+
+      <div class="side-label">Workspace</div>
+      <button class="side-item active" type="button" aria-current="page">
+        <span aria-hidden="true">◷</span> Current chat
+      </button>
+
+      <div class="sidebar-bottom">
+        <button class="install-btn" id="installBtn" hidden type="button">Install NOVA</button>
+        <div class="status-line"><span class="status-dot"></span><span>Ready when you are</span></div>
+      </div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <button class="mobile-menu" id="mobileMenu" type="button" aria-label="Open menu">☰</button>
+        <div class="mobile-brand"><span class="brand-mark small" aria-hidden="true">✳</span> NOVA AI</div>
+        <div class="top-actions">
+          <span class="online-status"><i></i> Online</span>
+          <button class="icon-btn" id="clearChat" type="button" title="Clear conversation" aria-label="Clear conversation">↺</button>
+        </div>
+      </header>
+
+      <section class="conversation" id="conversation" aria-live="polite">
+        <div class="welcome" id="welcome">
+          <div class="welcome-mark" aria-hidden="true">✳</div>
+          <h1>Think it through<br>with NOVA</h1>
+          <p>A personal AI to help you understand, decide and move forward.</p>
+
+          <div class="suggestions">
+            <button class="suggestion" data-prompt="Help me think through an important decision. Ask me the key questions first." type="button">
+              <span class="suggestion-icon" aria-hidden="true">◇</span>
+              <span class="suggestion-copy"><b>Make a decision</b><small>Compare options and trade-offs</small></span>
+              <span class="suggestion-arrow" aria-hidden="true">↗</span>
+            </button>
+            <button class="suggestion" data-prompt="Explain a topic I am trying to understand in clear, simple language." type="button">
+              <span class="suggestion-icon" aria-hidden="true">⌕</span>
+              <span class="suggestion-copy"><b>Understand something</b><small>Get a clear explanation</small></span>
+              <span class="suggestion-arrow" aria-hidden="true">↗</span>
+            </button>
+            <button class="suggestion" data-prompt="Help me turn a goal into a realistic action plan." type="button">
+              <span class="suggestion-icon" aria-hidden="true">↗</span>
+              <span class="suggestion-copy"><b>Build a plan</b><small>Turn an idea into next steps</small></span>
+              <span class="suggestion-arrow" aria-hidden="true">↗</span>
+            </button>
+            <button class="suggestion" data-prompt="Help me solve a problem. Start by identifying what information is missing." type="button">
+              <span class="suggestion-icon" aria-hidden="true">{ }</span>
+              <span class="suggestion-copy"><b>Work through a problem</b><small>Find a practical way forward</small></span>
+              <span class="suggestion-arrow" aria-hidden="true">↗</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="messages" id="messages"></div>
+      </section>
+
+      <footer class="composer-wrap">
+        <div id="attachmentPreview" class="attachment-preview" hidden></div>
+        <form class="composer" id="chatForm">
+          <textarea id="prompt" rows="1" maxlength="6000"
+            placeholder="Ask NOVA anything..." aria-label="Message NOVA AI"></textarea>
+          <div class="composer-bottom">
+            <div class="composer-tools">
+              <input id="fileInput" type="file"
+                accept="image/png,image/jpeg,image/webp,image/gif,application/pdf" hidden>
+              <button id="attachBtn" class="attach-btn" type="button"
+                aria-label="Attach image or PDF" title="Attach image or PDF">
+                <span aria-hidden="true">＋</span> Attach
+              </button>
+              <span class="composer-note">Images and PDFs · 4 MB max</span>
+            </div>
+            <button class="send-btn" id="sendBtn" type="submit" aria-label="Send message">
+              <span aria-hidden="true">↑</span>
+            </button>
+          </div>
+        </form>
+        <div class="footer-note">NOVA can make mistakes. Check important information.</div>
+      </footer>
+    </main>
+  </div>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <script src="/app.js" defer></script>
+</body>
+</html>

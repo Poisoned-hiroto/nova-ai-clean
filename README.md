@@ -1,74 +1,61 @@
-# NOVA AI — Python + Vercel + installable PWA
+# NOVA AI
 
-A beginner-friendly AI chatbot with a responsive interface, server-side Python API, and Android home-screen installation support.
+NOVA AI is a browser-based assistant with a single FastAPI backend, NVIDIA Nemotron text chat, Gemini 2.5 Flash image/PDF analysis, and optional MongoDB Atlas guest conversation history.
 
-## Requirements
+## Features
+- NVIDIA Nemotron text chat
+- Gemini image and PDF analysis
+- Guest conversation history in MongoDB Atlas
+- File-analysis results saved to the active conversation when MongoDB is available
+- Responsive dark interface and installable PWA
+- Chat and file analysis continue even if MongoDB history is unavailable
 
-- A GitHub account
-- A Vercel account
-- A Hugging Face account/token with Inference Providers access
-- For local development: Python 3.10+ and Node.js/npm (Vercel CLI runs with Node)
+## Environment variables
+Configure these in Vercel Project Settings → Environment Variables:
 
-## 1. Get an AI token
+| Variable | Purpose |
+| --- | --- |
+| NVIDIA_API_KEY | NVIDIA text-chat API key |
+| GEMINI_API_KEY | Gemini image/PDF analysis API key |
+| MONGODB_URI | MongoDB Atlas connection string |
 
-1. Open https://huggingface.co/settings/tokens
-2. Create a token with the permissions needed to use Inference Providers.
-3. Keep the token private. Do not paste it into `app.js`, `index.html`, or GitHub files.
+NVIDIA and Gemini keys are required for their respective features. MongoDB is required for persistent history, but a database outage should not discard a successful model response. Never put keys in frontend files or commit them to GitHub. Redeploy after changing environment variables.
 
-The app uses the Hugging Face OpenAI-compatible router with model `openai/gpt-oss-120b`. Availability and free quota can change; if this model is unavailable for your account, choose a currently supported chat model from Hugging Face Inference Providers and update `MODEL` in `api/chat.py`.
+## Vercel deployment
+1. Import this repository into Vercel.
+2. Set the Root Directory to the repository root.
+3. Add the three environment variables above.
+4. Deploy.
+5. Open /api/health and check the configured flags.
+6. Test text chat, file analysis, and history separately.
 
-## 2. Deploy on Vercel
+The Python entrypoint is main.py, selected by pyproject.toml as main:app. All API routes are served by one FastAPI application. Frontend assets are in public/.
 
-1. Unzip this project.
-2. Upload the contents of the `nova-ai-chatbot` folder to a new GitHub repository.
-3. Go to https://vercel.com/new and import that repository.
-4. Keep the project root as the repository root. Vercel should detect the Python function in `api/chat.py`.
-5. In Vercel Project → Settings → Environment Variables, add:
-   - Name: `HF_TOKEN`
-   - Value: your Hugging Face token
-   - Environments: Production, Preview, Development as needed
-6. Redeploy after adding the variable.
-7. Open the deployed URL and send a test message.
+## Local development
+Use Python 3.12 or newer:
 
-The API route is `/api/chat`; the token is read only on the server. Never expose it in browser code.
-
-## 3. Run locally (optional)
-
-Install the Vercel CLI and log in:
-
-```bash
-npm install -g vercel
-vercel dev
+Windows PowerShell:
+```powershell
+python -m venv .venv
+.venv\Scripts\activate
+pip install -r requirements.txt
+uvicorn main:app --reload
 ```
 
-Add the `HF_TOKEN` variable in Vercel's local environment setup, or create a `.env` file with:
+Open http://127.0.0.1:8000.
 
-```text
-HF_TOKEN=your_token_here
-```
+## API routes
 
-Do not commit `.env`. `vercel dev` serves the static frontend and Python function together. If you prefer testing only the interface, opening `index.html` directly will not make AI calls work; the `/api/chat` endpoint must be served.
+| Method | Route | Purpose |
+| --- | --- | --- |
+| GET | /api/health | Configuration status |
+| POST | /api/chat | Text chat and history actions |
+| POST | /api/analyze | Image/PDF analysis |
 
-## 4. Install on Android
+The chat endpoint supports the existing frontend actions: chat, create, list, load, and delete.
 
-1. Open the deployed HTTPS URL in Chrome on Android.
-2. Open Chrome's ⋮ menu.
-3. Tap **Install app** or **Add to Home screen** (wording depends on Chrome version).
-4. Launch NOVA AI from the new home-screen icon.
+## Upload limits
+Supported: JPEG, PNG, WebP, GIF, and PDF. Maximum file size: 4 MB.
 
-PWA install prompts vary by browser and device. The web app is not an APK and is not published on Google Play.
-
-## What's included
-
-- Responsive dark interface and starter prompts
-- Python serverless chat endpoint
-- Conversation kept in the current browser tab session
-- Copy-response buttons
-- Clear/new conversation
-- PWA manifest, icon, and service worker shell caching
-
-## Notes
-
-- AI provider quotas, model availability, Vercel limits, and response times are not guaranteed to be free or unlimited.
-- No user accounts or database are included in this starter.
-- The service worker caches the app shell only; AI replies require an internet connection.
+## Important
+The health endpoint confirms whether environment variables are present; it does not validate the credentials or provider quotas. A successful Vercel deployment alone does not prove that NVIDIA, Gemini, or MongoDB is reachable. Test each feature after deployment.
